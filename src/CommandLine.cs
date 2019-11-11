@@ -29,8 +29,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Mono.Terminal;
-using Mono.Unix;
-using Mono.Unix.Native;
 using Mono.Debugger.Client.Commands;
 
 namespace Mono.Debugger.Client
@@ -69,14 +67,7 @@ namespace Mono.Debugger.Client
             }
         }
 
-        internal static void SetUnixSignalAction(Signum signal, SignalAction action)
-        {
-            // This seemingly pointless method adds some
-            // indirection so that we don't load `Mono.Posix`
-            // unless we absolutely need to.
-            Stdlib.SetSignalAction(signal, action);
-        }
-
+        
         static void Process(string cmd, bool rc)
         {
             if (!rc && _lineEditor == null)
@@ -187,42 +178,6 @@ namespace Mono.Debugger.Client
             e.Cancel = true;
         }
 
-        internal static void SetControlCHandler()
-        {
-            if (Utilities.IsWindows)
-            {
-                if (!_windowsConsoleHandlerSet)
-                    Console.CancelKeyPress += ConsoleControlCHandler;
-
-                _windowsConsoleHandlerSet = true;
-            }
-            else if (_signalThread == null)
-            {
-                SetUnixSignalAction(Signum.SIGINT, SignalAction.Default);
-
-                _signalThread = new Thread(() =>
-                {
-                    try
-                    {
-                        using (var sig = new UnixSignal(Signum.SIGINT))
-                        {
-                            while (true)
-                            {
-                                sig.WaitOne();
-
-                                ControlCHandler();
-                            }
-                        }
-                    }
-                    catch (ThreadAbortException)
-                    {
-                    }
-                });
-
-                _signalThread.Start();
-            }
-        }
-
         internal static void UnsetControlCHandler()
         {
             if (Utilities.IsWindows)
@@ -238,7 +193,7 @@ namespace Mono.Debugger.Client
 
                 _signalThread = null;
 
-                SetUnixSignalAction(Signum.SIGINT, SignalAction.Ignore);
+                //SetUnixSignalAction(Signum.SIGINT, SignalAction.Ignore);
             }
         }
 

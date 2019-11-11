@@ -32,13 +32,16 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using Mono.Debugging.Client;
 using Mono.Debugging.Soft;
+using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
+using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
+
 
 namespace Mono.Debugger.Client
 {
     public static class Debugger
     {
         static readonly object _lock = new object();
-
+        public static DebugProtocolClient protocol = null;
         static Debugger()
         {
             EnsureCreated();
@@ -136,9 +139,9 @@ namespace Mono.Debugger.Client
             }
         }
 
-        static StackFrame _activeFrame;
+        static Mono.Debugging.Client.StackFrame _activeFrame;
 
-        public static StackFrame ActiveFrame
+        public static Mono.Debugging.Client.StackFrame ActiveFrame
         {
             get
             {
@@ -174,7 +177,7 @@ namespace Mono.Debugger.Client
             ex.Message.Discard();
 
             while (ex.Message == "Loading...")
-                Thread.Sleep(10);
+                System.Threading.Thread.Sleep(10);
 
             Log.Error("{0}{1}: {2}", prefix, ex.Type, ex.Message);
         }
@@ -283,8 +286,7 @@ namespace Mono.Debugger.Client
                     // The inferior process has launched, so we can safely
                     // set our `SIGINT` handler without it interfering with
                     // the inferior.
-                    CommandLine.SetControlCHandler();
-
+                    
                     Log.Notice("Inferior process '{0}' ('{1}') started",
                                ActiveProcess.Id, StringizeTarget());
                 };
@@ -309,8 +311,8 @@ namespace Mono.Debugger.Client
 
                 _session.TargetHitBreakpoint += (sender, e) =>
                 {
-                    var bp = e.BreakEvent as Breakpoint;
-                    var fbp = e.BreakEvent as FunctionBreakpoint;
+                    var bp = e.BreakEvent as Mono.Debugging.Client.Breakpoint;
+                    var fbp = e.BreakEvent as Mono.Debugging.Client.FunctionBreakpoint;
 
                     if (fbp != null)
                         Log.Notice("Hit method breakpoint on '{0}'", fbp.FunctionName);
@@ -322,7 +324,11 @@ namespace Mono.Debugger.Client
 
                         Log.Notice("Hit breakpoint at '{0}:{1}'{2}", bp.FileName, bp.Line, cond);
                     }
-
+                    StoppedEvent stopEvent = new StoppedEvent(StoppedEvent.ReasonValue.Breakpoint);
+                    stopEvent.ThreadId = (int)e.Thread.Id;
+                    stopEvent.AllThreadsStopped = true;
+                    stopEvent.Description = "Paused on breakpoint";
+                    protocol.SendEvent(stopEvent);
                     Log.Emphasis(Utilities.StringizeFrame(ActiveFrame, true));
 
                     CommandLine.ResumeEvent.Set();
@@ -384,8 +390,9 @@ namespace Mono.Debugger.Client
 
                 _session.TargetThreadStarted += (sender, e) =>
                 {
-                    Log.Notice("Inferior thread '{0}' ('{1}') started",
-                               e.Thread.Id, e.Thread.Name);
+                    //Log.Notice("Inferior thread '{0}' ('{1}') started",
+                    //e.Thread.Id, e.Thread.Name);
+                    protocol.SendEvent(new ThreadEvent(ThreadEvent.ReasonValue.Started, (int) e.Thread.Id));
                 };
 
                 _session.TargetThreadStopped += (sender, e) =>

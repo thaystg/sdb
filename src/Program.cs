@@ -25,7 +25,7 @@
 using System;
 using System.Collections.Generic;
 using Mono.Options;
-using Mono.Unix.Native;
+//using Mono.Unix.Native;
 
 namespace Mono.Debugger.Client
 {
@@ -99,9 +99,7 @@ namespace Mono.Debugger.Client
             // debuggee to die if the user hits Ctrl-C. We set our signal
             // disposition to `SIG_IGN` so that the debuggee inherits
             // this and doesn't die.
-            if (!Utilities.IsWindows && !batch)
-                CommandLine.SetUnixSignalAction(Signum.SIGINT, SignalAction.Ignore);
-
+            
             CommandLine.Run(ver, batch, rc, cmds, files);
 
             return 0;
